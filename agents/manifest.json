@@ -1,0 +1,104 @@
+{
+  "version": "1.0",
+  "notes": "Rebuild from scratch where necessary; prefer reusing working components.",
+  "global_settings": {
+    "brand": "Aspect Marketing Solutions",
+    "primary_domain": "https://aspectmarketingsolutions.app",
+    "holder_site": "https://bmwxqdxn.manus.space",
+    "notify_sms": true,
+    "notify_email": true
+  },
+  "agents": [
+    {
+      "name": "Aspect.Overmind",
+      "category": "orchestration",
+      "capabilities": [
+        "AI App Builder (APK/AAB + Play Store submission assets)",
+        "AI Coder (apps, APIs, agents, websites)",
+        "Website Builder + hosting + CI/CD",
+        "Product Creator (Etsy, Printify, Amazon)",
+        "Amazon Listing Automation",
+        "Funnel Creation + Landing Pages",
+        "API Key Generator (links + secret storage hooks)",
+        "Inter-op across all sub\u2011agents"
+      ],
+      "status": "priority",
+      "reuse": true
+    },
+    {
+      "name": "Printify\u2194Etsy Sync",
+      "category": "ecommerce",
+      "capabilities": [
+        "Sync products/variants",
+        "Auto-generate mockups",
+        "Daily auto-posting (50/day cap adjustable)",
+        "Bundle CSV import/export"
+      ],
+      "integration": [
+        "Printify",
+        "Etsy",
+        "Pinterest",
+        "Instagram"
+      ],
+      "reuse": true
+    },
+    {
+      "name": "YouTube Uploader Agent",
+      "category": "media",
+      "capabilities": [
+        "MP4 upload",
+        "thumbnail + hashtags",
+        "public uploader app"
+      ],
+      "integration": [
+        "YouTube",
+        "Agent Memory"
+      ],
+      "reuse": true
+    },
+    {
+      "name": "AGI Commander",
+      "category": "control",
+      "capabilities": [
+        "voice interface",
+        "custom avatar",
+        "terminal-style UI",
+        "persona memory"
+      ],
+      "reuse": true
+    },
+    {
+      "name": "Reverse-Engineering Intelligence Agent",
+      "category": "research",
+      "capabilities": [
+        "monitor v0/Manus/Claude/AutoGPT/AgentOps releases",
+        "scrape changelogs/tutorials",
+        "self-improvement + repair suggestions"
+      ],
+      "reuse": true
+    },
+    {
+      "name": "DAO & Token Suite",
+      "category": "web3",
+      "capabilities": [
+        "Airdrop tracker",
+        "Yield pool",
+        "Treasury dashboard",
+        "Snapshot votes",
+        "Cross-chain deployment (Base/Arbitrum/Solana)"
+      ],
+      "reuse": true
+    },
+    {
+      "name": "Bagelwaffles Stream Agent",
+      "category": "creator",
+      "capabilities": [
+        "overlay pack",
+        "clips bot",
+        "merch triggers",
+        "multi-stream schedule + alerts"
+      ],
+      "reuse": true
+    }
+  ]
+}
