@@ -6,18 +6,29 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { Activity, Settings, Play, Pause, BarChart3, Clock, Zap } from "lucide-react"
+import { Activity, Settings, Play, Pause, BarChart3, Clock, Zap, ExternalLink } from "lucide-react"
 import { notFound } from "next/navigation"
 
 const agentData = {
   overmind: {
     name: "Aspect.Overmind",
-    description: "Central orchestration and coordination agent",
+    description: "Central orchestration and coordination agent with comprehensive AI capabilities",
     status: "active",
     uptime: "99.9%",
     tasksCompleted: 15847,
     currentLoad: 67,
-    capabilities: ["Task Orchestration", "Agent Coordination", "Resource Management", "Decision Making"],
+    category: "orchestration",
+    capabilities: [
+      "AI App Builder (APK/AAB + Play Store submission assets)",
+      "AI Coder (apps, APIs, agents, websites)",
+      "Website Builder + hosting + CI/CD",
+      "Product Creator (Etsy, Printify, Amazon)",
+      "Amazon Listing Automation",
+      "Funnel Creation + Landing Pages",
+      "API Key Generator (links + secret storage hooks)",
+      "Inter-op across all sub-agents",
+    ],
+    integrations: ["All Platform Services", "CI/CD Pipeline", "Cloud Hosting", "App Stores"],
     metrics: {
       avgResponseTime: "0.3s",
       successRate: "99.2%",
@@ -26,13 +37,20 @@ const agentData = {
     },
   },
   ecommerce: {
-    name: "Aspect.EcommerceAutomation",
-    description: "Automated ecommerce operations and integrations",
+    name: "Printify↔Etsy Sync",
+    description: "Automated ecommerce operations with product synchronization and marketplace management",
     status: "active",
     uptime: "98.7%",
     tasksCompleted: 8934,
     currentLoad: 45,
-    capabilities: ["Etsy Integration", "Printify Sync", "Order Processing", "Inventory Management"],
+    category: "ecommerce",
+    capabilities: [
+      "Sync products/variants",
+      "Auto-generate mockups",
+      "Daily auto-posting (50/day cap adjustable)",
+      "Bundle CSV import/export",
+    ],
+    integrations: ["Printify", "Etsy", "Pinterest", "Instagram"],
     metrics: {
       avgResponseTime: "1.2s",
       successRate: "97.8%",
@@ -41,13 +59,15 @@ const agentData = {
     },
   },
   media: {
-    name: "Aspect.MediaUploader",
-    description: "Media processing and upload management",
+    name: "YouTube Uploader Agent",
+    description: "Media processing and upload management with automated content publishing",
     status: "active",
     uptime: "99.1%",
     tasksCompleted: 12456,
     currentLoad: 78,
-    capabilities: ["File Processing", "Format Conversion", "Cloud Upload", "Thumbnail Generation"],
+    category: "media",
+    capabilities: ["MP4 upload", "Thumbnail + hashtags", "Public uploader app"],
+    integrations: ["YouTube", "Agent Memory"],
     metrics: {
       avgResponseTime: "2.1s",
       successRate: "98.5%",
@@ -56,13 +76,15 @@ const agentData = {
     },
   },
   control: {
-    name: "Aspect.Control",
-    description: "Voice and command interface management",
+    name: "AGI Commander",
+    description: "Advanced voice and command interface with custom avatar and terminal-style UI",
     status: "idle",
     uptime: "97.3%",
     tasksCompleted: 3421,
     currentLoad: 12,
-    capabilities: ["Voice Recognition", "Command Processing", "Action Execution", "Feedback Generation"],
+    category: "control",
+    capabilities: ["Voice interface", "Custom avatar", "Terminal-style UI", "Persona memory"],
+    integrations: ["Voice Recognition", "Avatar System", "Terminal Interface"],
     metrics: {
       avgResponseTime: "0.8s",
       successRate: "95.6%",
@@ -71,13 +93,19 @@ const agentData = {
     },
   },
   research: {
-    name: "Aspect.Research",
-    description: "Data collection and analysis automation",
+    name: "Reverse-Engineering Intelligence Agent",
+    description: "Advanced research and intelligence gathering with self-improvement capabilities",
     status: "active",
     uptime: "98.9%",
     tasksCompleted: 6789,
     currentLoad: 56,
-    capabilities: ["Data Mining", "Market Analysis", "Trend Detection", "Report Generation"],
+    category: "research",
+    capabilities: [
+      "Monitor v0/Manus/Claude/AutoGPT/AgentOps releases",
+      "Scrape changelogs/tutorials",
+      "Self-improvement + repair suggestions",
+    ],
+    integrations: ["Web Scraping", "API Monitoring", "Documentation Systems"],
     metrics: {
       avgResponseTime: "3.4s",
       successRate: "96.7%",
@@ -86,13 +114,21 @@ const agentData = {
     },
   },
   web3dao: {
-    name: "Aspect.Web3DAO",
-    description: "Blockchain and DAO governance automation",
+    name: "DAO & Token Suite",
+    description: "Comprehensive blockchain and DAO governance automation with multi-chain support",
     status: "active",
     uptime: "99.5%",
     tasksCompleted: 2156,
     currentLoad: 34,
-    capabilities: ["Smart Contracts", "Governance Voting", "Token Management", "DeFi Integration"],
+    category: "web3",
+    capabilities: [
+      "Airdrop tracker",
+      "Yield pool",
+      "Treasury dashboard",
+      "Snapshot votes",
+      "Cross-chain deployment (Base/Arbitrum/Solana)",
+    ],
+    integrations: ["Base", "Arbitrum", "Solana", "Snapshot", "DeFi Protocols"],
     metrics: {
       avgResponseTime: "1.8s",
       successRate: "98.9%",
@@ -101,13 +137,15 @@ const agentData = {
     },
   },
   creator: {
-    name: "Aspect.CreatorTools",
-    description: "Content creation and publishing automation",
+    name: "Bagelwaffles Stream Agent",
+    description: "Comprehensive creator tools for streaming and content creation with automation",
     status: "active",
     uptime: "98.2%",
     tasksCompleted: 9876,
     currentLoad: 62,
-    capabilities: ["Content Generation", "Social Media Posting", "SEO Optimization", "Analytics Tracking"],
+    category: "creator",
+    capabilities: ["Overlay pack", "Clips bot", "Merch triggers", "Multi-stream schedule + alerts"],
+    integrations: ["Streaming Platforms", "Clip Generation", "Merchandise Systems", "Alert Systems"],
     metrics: {
       avgResponseTime: "2.7s",
       successRate: "97.1%",
@@ -159,6 +197,9 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
             <div>
               <h1 className="text-3xl font-bold text-balance">{agent.name}</h1>
               <p className="text-muted-foreground mt-2">{agent.description}</p>
+              <Badge variant="outline" className="mt-2 capitalize">
+                {agent.category}
+              </Badge>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -243,6 +284,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="metrics">Metrics</TabsTrigger>
             <TabsTrigger value="logs">Activity Logs</TabsTrigger>
           </TabsList>
@@ -303,7 +345,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
           </TabsContent>
 
           <TabsContent value="capabilities" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {agent.capabilities.map((capability, index) => (
                 <Card key={index}>
                   <CardContent className="p-6">
@@ -315,6 +357,30 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Connected Integrations</CardTitle>
+                <CardDescription>External services and platforms this agent connects to</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {agent.integrations.map((integration, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="font-medium">{integration}</span>
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="metrics" className="space-y-4">
