@@ -1,8 +1,8 @@
 // app/api/session/[sessionId]/step/route.ts
+// ASYNC VERSION: Returns immediately, n8n calls back with updates
+
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { getSession, pushStep } from '@/lib/sessionStore';
-import { AGENTS } from '@/lib/agents';
+import { getSession, updateSession } from '@/lib/sessionStore';
 
 export async function POST(
   request: NextRequest,
@@ -27,18 +27,13 @@ export async function POST(
       );
     }
 
-    // Determine which agent to use (simple orchestration)
-    const agentId = session.steps.length === 0 ? 'research' : 'research';
-    const agent = AGENTS.find((a) => a.id === agentId);
+    // Mark session as processing
+    await updateSession(sessionId, {
+      status: 'processing',
+      lastActivity: Date.now(),
+    });
 
-    if (!agent) {
-      return NextResponse.json(
-        { error: 'Agent not found' },
-        { status: 500 }
-      );
-    }
-
-    // Call n8n webhook
+    // Call n8n webhook ASYNC (fire and forget)
     const webhookUrl = process.env.N8N_WEBHOOK_URL;
     if (!webhookUrl) {
       return NextResponse.json(
@@ -47,34 +42,36 @@ export async function POST(
       );
     }
 
-    const n8nResponse = await fetch(webhookUrl, {
+    // Construct callback URL
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = request.headers.get('host') || 'localhost:3000';
+    const callbackUrl = `${protocol}://${host}/api/session/update`;
+
+    // Fire and forget - n8n will call us back
+    fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         sessionId,
-        agentId,
         input,
-        context: session.steps,
+        callbackUrl,
+        context: session.steps || [],
       }),
+    }).catch((error) => {
+      console.error('Failed to trigger n8n workflow:', error);
     });
 
-    if (!n8nResponse.ok) {
-      throw new Error('n8n webhook failed');
-    }
-
-    const { output } = await n8nResponse.json();
-
-    const step = {
-      id: nanoid(),
-      agentId,
-      input,
-      output,
-      timestamp: Date.now(),
-    };
-
-    await pushStep(sessionId, step);
-
-    return NextResponse.json({ step }, { status: 200 });
+    // Return immediately with accepted status
+    return NextResponse.json(
+      { 
+        ok: true,
+        message: 'Request accepted. Processing asynchronously.',
+        sessionId 
+      },
+      { status: 202 } // 202 Accepted
+    );
   } catch (error) {
     console.error('Error processing step:', error);
     return NextResponse.json(
