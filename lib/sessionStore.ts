@@ -59,7 +59,5 @@ export async function setSession(session: any): Promise<void> {
   const id = session.sessionId || session.id;
   if (!id) throw new Error('Session must have an id or sessionId');
   sessions.set(id, session as AgentSession);
-}
-}
-
+  }
 }
