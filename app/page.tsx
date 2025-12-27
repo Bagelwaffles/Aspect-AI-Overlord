@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { StartSessionButton } from "@/components/start-session-button"
 import {
   ArrowRight,
   Bot,
@@ -133,6 +134,7 @@ export default function HomePage() {
                 Discover Our Agents <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
+                          <StartSessionButton />
             <Button size="lg" variant="outline">
               Watch Demo <Play className="ml-2 h-4 w-4" />
             </Button>
