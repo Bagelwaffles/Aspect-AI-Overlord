@@ -52,6 +52,7 @@ export function deleteSession(id: string): boolean {
 
 export function getAllSessions(): AgentSession[] {
   return Array.from(sessions.values());
+  }
 
 // Generic setSession for API compatibility
 export async function setSession(session: any): Promise<void> {
@@ -59,4 +60,6 @@ export async function setSession(session: any): Promise<void> {
   if (!id) throw new Error('Session must have an id or sessionId');
   sessions.set(id, session as AgentSession);
 }
+}
+
 }
