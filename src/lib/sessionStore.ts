@@ -11,9 +11,22 @@ export interface SessionStep {
   timestamp: number;
 }
 
+export interface SessionEvent {
+  id: string;
+  agent: string;
+  message: string;
+  status: 'started' | 'in_progress' | 'done' | 'error';
+  timestamp: number;
+}
+
 export interface Session {
   sessionId: string;
   steps: SessionStep[];
+  events?: SessionEvent[]; // Live step events from n8n
+  activeAgent?: string; // Current agent processing
+  output?: string; // Final output from n8n
+  status?: 'idle' | 'processing' | 'completed' | 'error';
+  error?: string; // Error message if failed
   createdAt: number;
   lastActivity: number;
 }
