@@ -1,86 +1,61 @@
-// src/lib/sessionStore.ts
-// Abstract session storage with KV fallback
-
-import { kv } from '@vercel/kv';
-
-export interface SessionStep {
+// In-memory session store
+export interface AgentSession {
   id: string;
-  agentId: string;
-  input: string;
-  output: string;
-  timestamp: number;
+  agentKey: string;
+  status: 'active' | 'waiting' | 'completed' | 'error';
+  currentStep: number;
+  steps: Array<{
+    stepNumber: number;
+    status: 'pending' | 'running' | 'completed' | 'error';
+    input?: any;
+    output?: any;
+    error?: string;
+    startedAt?: Date;
+    completedAt?: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface SessionEvent {
-  id: string;
-  agent: string;
-  message: string;
-  status: 'started' | 'in_progress' | 'done' | 'error';
-  timestamp: number;
+const sessions = new Map<string, AgentSession>();
+
+export function createSession(id: string, agentKey: string): AgentSession {
+  const session: AgentSession = {
+    id,
+    agentKey,
+    status: 'active',
+    currentStep: 1,
+    steps: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  sessions.set(id, session);
+  return session;
 }
 
-export interface Session {
-  sessionId: string;
-  steps: SessionStep[];
-  events?: SessionEvent[]; // Live step events from n8n
-  activeAgent?: string; // Current agent processing
-  output?: string; // Final output from n8n
-  status?: 'idle' | 'processing' | 'completed' | 'error';
-  error?: string; // Error message if failed
-  createdAt: number;
-  lastActivity: number;
+export function getSession(id: string): AgentSession | undefined {
+  return sessions.get(id);
 }
 
-const SESSION_TTL = 60 * 60 * 24; // 24 hours
-
-export async function getSession(sessionId: string): Promise<Session | null> {
-  try {
-    const session = await kv.get<Session>(`session:${sessionId}`);
-    return session;
-  } catch (error) {
-    console.error('Error getting session:', error);
-    return null;
-  }
+export function updateSession(id: string, updates: Partial<AgentSession>): AgentSession | undefined {
+  const session = sessions.get(id);
+  if (!session) return undefined;
+  
+  const updated = { ...session, ...updates, updatedAt: new Date() };
+  sessions.set(id, updated);
+  return updated;
 }
 
-export async function setSession(session: Session): Promise<void> {
-  try {
-    await kv.set(`session:${session.sessionId}`, session, { ex: SESSION_TTL });
-  } catch (error) {
-    console.error('Error setting session:', error);
-    throw error;
-  }
+export function deleteSession(id: string): boolean {
+  return sessions.delete(id);
 }
 
-export async function updateSession(
-  sessionId: string,
-  updates: Partial<Session>
-): Promise<void> {
-  try {
-    const session = await getSession(sessionId);
-    if (!session) throw new Error('Session not found');
-    
-    const updated = { ...session, ...updates, lastActivity: Date.now() };
-    await setSession(updated);
-  } catch (error) {
-    console.error('Error updating session:', error);
-    throw error;
-  }
+export function getAllSessions(): AgentSession[] {
+  return Array.from(sessions.values());
 }
 
-export async function pushStep(
-  sessionId: string,
-  step: SessionStep
-): Promise<void> {
-  try {
-    const session = await getSession(sessionId);
-    if (!session) throw new Error('Session not found');
-    
-    session.steps.push(step);
-    session.lastActivity = Date.now();
-    await setSession(session);
-  } catch (error) {
-    console.error('Error pushing step:', error);
-    throw error;
-  }
+export async function setSession(session: any): Promise<void> {
+  const id = session.sessionId || session.id;
+  if (!id) throw new Error('Session must have an id or sessionId');
+  sessions.set(id, session as AgentSession);
 }
