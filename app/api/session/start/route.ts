@@ -9,6 +9,20 @@ export async function POST(request: NextRequest) {
     
     // Create session using the proper AgentSession structure
     const session = createSession(sessionId, 'default');
+
+    // Trigger n8n workflow asynchronously
+    const webhookUrl = process.env.N8N_WEBHOOK_URL;
+    if (webhookUrl) {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          action: 'general',
+          payload: {}
+        })
+      }).catch(err => console.error('Failed to trigger n8n:', err));
+    }
     
     return NextResponse.json({ sessionId }, { status: 201 });
   } catch (error) {
