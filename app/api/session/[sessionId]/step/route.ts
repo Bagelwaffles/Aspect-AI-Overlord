@@ -1,8 +1,8 @@
 // app/api/session/[sessionId]/step/route.ts
-// ASYNC VERSION: Returns immediately, n8n calls back with updates
+// ASYNC VERSION: Returns immediately, triggers n8n async
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, updateSession } from '@/lib/sessionStore';
+import { redis, SESSION_TTL } from '@/app/lib/redis';
 
 export async function POST(
   request: NextRequest,
@@ -12,70 +12,47 @@ export async function POST(
     const { sessionId } = params;
     const { input } = await request.json();
 
-    if (!input) {
-      return NextResponse.json(
-        { error: 'Input is required' },
-        { status: 400 }
-      );
-    }
-
-    const session = await getSession(sessionId);
-    if (!session) {
+    // Get session from Redis
+    const sessionData = await redis.get(`session:${sessionId}`);
+    
+    if (!sessionData) {
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
     }
+    
+    const session = JSON.parse(sessionData as string);
 
-    // Mark session as processing
-    await updateSession(sessionId, {
-      status: 'processing',
-      lastActivity: Date.now(),
-    });
+    // Update session with user input
+    const updates = {
+      ...session,
+      userInput: input,
+      status: 'processing' as const,
+      updatedAt: new Date().toISOString(),
+    };
 
-    // Call n8n webhook ASYNC (fire and forget)
+    // Save to Redis with refreshed TTL
+    await redis.setex(`session:${sessionId}`, SESSION_TTL, JSON.stringify(updates));
+
+    // Trigger n8n workflow asynchronously (don't await)
     const webhookUrl = process.env.N8N_WEBHOOK_URL;
-    if (!webhookUrl) {
-      return NextResponse.json(
-        { error: 'Webhook URL not configured' },
-        { status: 500 }
-      );
+    if (webhookUrl) {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          userInput: input,
+        }),
+      }).catch(err => console.error('n8n webhook error:', err));
     }
 
-    // Construct callback URL
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = request.headers.get('host') || 'localhost:3000';
-    const callbackUrl = `${protocol}://${host}/api/session/update`;
-
-    // Fire and forget - n8n will call us back
-    fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sessionId,
-        input,
-        callbackUrl,
-        context: session.steps || [],
-      }),
-    }).catch((error) => {
-      console.error('Failed to trigger n8n workflow:', error);
-    });
-
-    // Return immediately with accepted status
-    return NextResponse.json(
-      { 
-        ok: true,
-        message: 'Request accepted. Processing asynchronously.',
-        sessionId 
-      },
-      { status: 202 } // 202 Accepted
-    );
+    return NextResponse.json({ success: true, session: updates });
   } catch (error) {
-    console.error('Error processing step:', error);
+    console.error('Error in step route:', error);
     return NextResponse.json(
-      { error: 'Failed to process step' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
