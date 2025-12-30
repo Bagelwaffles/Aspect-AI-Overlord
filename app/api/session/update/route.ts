@@ -2,7 +2,7 @@
 // Secure callback endpoint for n8n async updates
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, updateSession } from '@/lib/sessionStore';
+import { redis, SESSION_TTL } from '@/app/lib/redis';
 
 // Standard event types from n8n
 interface CallbackEvent {
@@ -40,11 +40,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current session
-    const session = await getSession(event.sessionId);
-    if (!session) {
-      return NextResponse.json(
+        // Get session from Redis
+    const sessionData = await redis.get(`session:${event.sessionId}`);
+    if (!sessionData) {
+            return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
+      );
+    }
+    const session = JSON.parse(sessionData);
       );
     }
 
@@ -83,7 +87,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Persist updates
-    await updateSession(event.sessionId, updates);
+        // Persist updates to Redis
+    const updatedSession = { ...session, ...updates };
+    await redis.setex(`session:${event.sessionId}`, SESSION_TTL, JSON.stringify(updatedSession));
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {

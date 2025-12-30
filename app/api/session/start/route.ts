@@ -1,14 +1,21 @@
 // app/api/session/start/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { createSession } from '@/lib/sessionStore';
+import { redis, SESSION_TTL } from '@/app/lib/redis';
 
 export async function POST(request: NextRequest) {
   try {
     const sessionId = nanoid();
     
     // Create session using the proper AgentSession structure
-    const session = createSession(sessionId, 'default');
+        const session = {
+      id: sessionId,
+      status: 'default' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Store in Redis with TTL
+    await redis.setex(`session:${sessionId}`, SESSION_TTL, JSON.stringify(session));
 
     // Trigger n8n workflow - AWAIT to ensure it completes
     const webhookUrl = process.env.N8N_WEBHOOK_URL;
