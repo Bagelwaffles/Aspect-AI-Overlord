@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from 'next/server';
 import { redis, SESSION_TTL } from '@/app/lib/redis';
 import { nanoid } from 'nanoid';
