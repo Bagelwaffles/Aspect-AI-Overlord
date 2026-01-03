@@ -6,10 +6,24 @@ import { nanoid } from 'nanoid'
 export default function Home() {
   const router = useRouter()
 
-  const handleStartSession = () => {
-    const sessionId = nanoid()
-    router.push(`/session/${sessionId}`)
-  }
+  const handleStartSession = async () => {
+    try {
+      const response = await fetch('/api/session/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to create session')
+      }
+      
+      const { sessionId } = await response.json()
+      router.push(`/session/${sessionId}`)
+    } catch (error) {
+      console.error('Error starting session:', error)
+    }
+  }  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
