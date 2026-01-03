@@ -21,8 +21,8 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(JSON.parse(sessionData as string));
-  } catch (error) {
+    const parsedData = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+    return NextResponse.json(parsedData);  } catch (error) {
 const hasUrl = !!process.env.UPSTASH_REDIS_REST_URL;
     const hasToken = !!process.env.UPSTASH_REDIS_REST_TOKEN;
     console.error('Redis GET diagnostic:', { hasUrl, hasToken, message: error.message });
