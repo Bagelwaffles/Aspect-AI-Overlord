@@ -1,5 +1,7 @@
 export const runtime = "nodejs";
 
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from 'next/server';
 import { redis } from '@/app/lib/redis';
 
@@ -21,7 +23,9 @@ export async function GET(
 
     return NextResponse.json(JSON.parse(sessionData as string));
   } catch (error) {
-    console.error('Error retrieving session:', error);
+const hasUrl = !!process.env.UPSTASH_REDIS_REST_URL;
+    const hasToken = !!process.env.UPSTASH_REDIS_REST_TOKEN;
+    console.error('Redis GET diagnostic:', { hasUrl, hasToken, message: error.message });
     return NextResponse.json(
       { error: 'Failed to retrieve session' },
       { status: 500 }
