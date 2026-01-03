@@ -14,6 +14,10 @@ export async function POST(request: Request) {
       id: sessionId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+          status: 'idle',
+              activeAgent: null,
+                  output: null,
+                      events: [],
       ...body
     };
 
