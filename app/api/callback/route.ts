@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from 'next/server';
-import { redis } from '@/app/lib/redis';
+import { redis, SESSION_TTL } from '@/app/lib/redis';
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     // Get the callback data from n8n
     const body = await request.json();
-    const { sessionId, response, status } = body;
+    const { sessionId, output, status, activeAgent, message } = body;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -44,16 +44,32 @@ export async function POST(request: Request) {
       ? JSON.parse(existingSession) 
       : existingSession;
 
-    // Update session with n8n response
+    // Create event if message provided
+    const events = sessionData.events || [];
+    if (message) {
+      events.push({
+        timestamp: new Date().toISOString(),
+        message,
+        agent: activeAgent || sessionData.activeAgent
+      });
+    }
+
+    // Update session with n8n response (only merge allowed fields)
     const updatedSession = {
       ...sessionData,
-      aiResponse: response,
-      status: status || 'completed',
+      ...(status && { status }),
+      ...(activeAgent && { activeAgent }),
+      ...(output && { output }),
+      events,
       updatedAt: new Date().toISOString()
     };
 
-    // Save updated session back to Redis
-    await redis.set(sessionKey, JSON.stringify(updatedSession));
+    // Save updated session back to Redis with TTL refresh
+    await redis.setex(
+      sessionKey,
+      SESSION_TTL,
+      JSON.stringify(updatedSession)
+    );
 
     return NextResponse.json({ 
       success: true,
