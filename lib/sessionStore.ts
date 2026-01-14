@@ -12,6 +12,7 @@ export interface AgentSession {
     error?: string;
     startedAt?: Date;
     completedAt?: Date;
+      snapshot?: string; // Base64 or URL to current agent screenshot
   }>;
   createdAt: Date;
   updatedAt: Date;
