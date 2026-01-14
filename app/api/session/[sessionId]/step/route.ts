@@ -11,7 +11,7 @@ export async function POST(
   try {
     const { sessionId } = params;
     const body = await request.json();
-    const { input } = body;
+    const { input, agentId } = body;
 
     if (!input?.trim()) {
       return NextResponse.json(
@@ -68,8 +68,7 @@ export async function POST(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId,
-            action: 'general',
-            input: input.trim(),
+            action: agentId || 'general',            input: input.trim(),
             callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.aspectmarketingsolutions.app'}/api/callback`
           })
         });
