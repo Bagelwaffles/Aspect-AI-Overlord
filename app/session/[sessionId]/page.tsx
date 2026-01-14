@@ -1,4 +1,3 @@
-// app/session/[sessionId]/page.tsx
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -14,6 +13,13 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
+
+  // Convert AGENTS Record to array for rendering
+  const agentsArray = Object.entries(AGENTS).map(([id, agent]) => ({
+    id,
+    name: agent.label,
+    ...agent
+  }));
 
   // Poll for session updates every 2 seconds
   useEffect(() => {
@@ -61,8 +67,7 @@ export default function SessionPage() {
   };
 
   const getAgentName = (agentId: string) => {
-    const agent = AGENTS.find(a => a.id === agentId);
-    return agent?.name || agentId;
+    return AGENTS[agentId]?.label || agentId;
   };
 
   if (error && !session) {
@@ -139,7 +144,7 @@ export default function SessionPage() {
               className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select an agent...</option>
-              {AGENTS.map(agent => (
+              {agentsArray.map(agent => (
                 <option key={agent.id} value={agent.id}>{agent.name}</option>
               ))}
             </select>
