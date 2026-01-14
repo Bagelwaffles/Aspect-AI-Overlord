@@ -11,6 +11,11 @@ export type AgentKey =
   | "store_product"
   | "store_page"
   | "analytics"
+    | "shopifystorebuilder"
+  | "shopifyproductgenerator"
+  | "shopifyseooptimizer"
+  | "shopifyautomation"
+  | "shopifyanalyticsoptimizer"
   | "onboarding"
   | "audit";
 
@@ -87,5 +92,30 @@ export const AGENTS: Record<
     label: "System Auditor",
     description: "Reviews your marketing systems and identifies improvements",
     videoUrl: "/videos/audit.mp4",
+  },
+    shopifystorebuilder: {
+    label: "Shopify Store Builder",
+    description: "Creates and configures a Shopify store end-to-end",
+    videoUrl: "/videos/shopify-store.mp4",
+  },
+  shopifyproductgenerator: {
+    label: "Shopify Product Generator",
+    description: "Generates optimized Shopify product listings",
+    videoUrl: "/videos/shopify-product.mp4",
+  },
+  shopifyseooptimizer: {
+    label: "Shopify SEO Optimizer",
+    description: "Optimizes Shopify store SEO and metadata",
+    videoUrl: "/videos/shopify-seo.mp4",
+  },
+  shopifyautomation: {
+    label: "Shopify Automation",
+    description: "Creates Shopify automations and workflows",
+    videoUrl: "/videos/shopify-automation.mp4",
+  },
+  shopifyanalyticsoptimizer: {
+    label: "Shopify Analytics Optimizer",
+    description: "Analyzes and improves Shopify performance",
+    videoUrl: "/videos/shopify-analytics.mp4",
   },
 };
