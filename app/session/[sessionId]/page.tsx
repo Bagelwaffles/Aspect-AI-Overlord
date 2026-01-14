@@ -14,6 +14,7 @@ export default function SessionPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+    const [selectedAgent, setSelectedAgent] = useState<string>('');
 
   // Poll for session updates every 2 seconds
   useEffect(() => {
@@ -47,8 +48,7 @@ export default function SessionPage() {
       const res = await fetch(`/api/session/${sessionId}/step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: input.trim() }),
-      });
+        body: JSON.stringify({ input: input.trim(), agentId: selectedAgent }),      });
       
       if (!res.ok) throw new Error('Failed to process step');
       
@@ -133,6 +133,16 @@ export default function SessionPage() {
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-4">
           <div className="flex gap-2">
+                    <select
+          value={selectedAgent}
+          onChange={(e) => setSelectedAgent(e.target.value)}
+          className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select an agent...</option>
+          {AGENTS.map(agent => (
+            <option key={agent.id} value={agent.id}>{agent.name}</option>
+          ))}
+        </select>
             <input
               type="text"
               value={input}
