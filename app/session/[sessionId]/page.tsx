@@ -53,6 +53,7 @@ export default function SessionPage() {
       if (!res.ok) throw new Error('Failed to process step');
       
       setInput('');
+            });
     } catch (err) {
       setError('Failed to send message');
     } finally {
