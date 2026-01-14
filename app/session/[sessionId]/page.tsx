@@ -4,6 +4,13 @@ import { useParams } from 'next/navigation';
 import type { Session, SessionEvent } from '@/lib/sessionStore';
 import { AGENTS } from '@/lib/agents';
 
+
+type Session = {
+  events: SessionEvent[];
+  output?: string;
+  error?: string;
+  snapshot?: string;
+};
 export default function SessionPage() {
   const params = useParams();
   const sessionId = params?.sessionId as string;
