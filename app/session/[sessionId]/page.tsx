@@ -48,7 +48,7 @@ export default function SessionPage() {
       const res = await fetch(`/api/session/${sessionId}/step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: input.trim(), agentId: selectedAgent }),      });
+        body: JSON.stringify({ input: input.trim(), agentId: selectedAgent })
       
       if (!res.ok) throw new Error('Failed to process step');
       
