@@ -23,7 +23,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error starting session:', error)
     }
-      }
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8">
@@ -40,6 +40,11 @@ export default function Home() {
           >
             Start New Session
           </button>
+          <div style={{ marginTop: 24, fontSize: 14 }}>
+            <p><a href="/dashboard">Dashboard</a></p>
+            <p><a href="/api/auth/signin/google?callbackUrl=/dashboard">Sign in with Google</a></p>
+            <p><a href="/api/auth/signout?callbackUrl=/">Sign out</a></p>
+          </div>
         </div>
       </div>
     </div>
