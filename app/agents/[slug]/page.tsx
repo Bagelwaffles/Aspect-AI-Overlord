@@ -1,120 +1,116 @@
 /**
- * /app/agents/[slug]/page.tsx
+ * app/agents/[slug]/page.tsx
  *
- * Protected agent detail page.
- * - Requires an authenticated session (server-side).
- * - Checks entitlement stub – swap in real DB/KV lookup as needed.
+ * Protected agent detail page — server component.
+ * force-dynamic: always server-rendered, never statically cached.
+ * Auth: getServerSession → redirect to sign-in if no session.
+ * Entitlement: reads from Redis via lib/entitlements.ts.
  */
 
-import { getServerSession } from "next-auth/next";
-import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import {
-    AGENT_BY_SLUG,
-    AGENT_REGISTRY,
-} from "@/lib/agents/registry";
+import { AGENT_BY_SLUG } from "@/lib/agents/registry";
+import { userHasEntitlement } from "@/lib/entitlements";
 
-// ---------------------------------------------------------------------------
-// Entitlement stub – replace with real lookup (DB, Redis, etc.)
-// ---------------------------------------------------------------------------
-async function userHasEntitlement(
-    _userEmail: string,
-    _slug: string
-  ): Promise<boolean> {
-    // TODO: query your entitlement store.
-  // Return true if the user holds a LIFETIME, SUB_*, or USAGE entitlement
-  // for this agent (populated by the Shopify orders/paid webhook).
-  return false; // stub: always returns false → "locked" state
+// Never statically cache — session + entitlements must be fresh every request
+export const dynamic = "force-dynamic";
+
+interface PageProps {
+      params: { slug: string };
 }
 
-// ---------------------------------------------------------------------------
-// Static params (optional – enables static generation)
-// ---------------------------------------------------------------------------
-export function generateStaticParams() {
-    return AGENT_REGISTRY.map((a) => ({ slug: a.slug }));
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-interface Props {
-    params: { slug: string };
-}
-
-export default async function AgentDetailPage({ params }: Props) {
-    const { slug } = params;
-
-  // 1. Auth guard
+export default async function AgentDetailPage({ params }: PageProps) {
+      // 1. Auth guard
   const session = await getServerSession(authOptions);
-    if (!session) {
-          redirect(`/api/auth/signin?callbackUrl=/agents/${slug}`);
-    }
+      if (!session) {
+              redirect(`/api/auth/signin?callbackUrl=/agents/${params.slug}`);
+      }
 
-  // 2. Agent must exist
+  const slug = (params.slug ?? "").toLowerCase();
+
+  // 2. Agent must exist in registry
   const agent = AGENT_BY_SLUG[slug];
-    if (!agent) notFound();
+      if (!agent) notFound();
 
-  // 3. Entitlement check
-  const userEmail = session.user?.email ?? "";
-    const entitled = await userHasEntitlement(userEmail, slug);
+  // 3. Email required for entitlement lookup
+  const email = session.user?.email ?? "";
+      if (!email) {
+              // Edge case: Google auth succeeded but returned no email
+        redirect("/api/auth/signin?callbackUrl=/agents/" + slug);
+      }
+
+  // 4. Real entitlement check (Redis SISMEMBER)
+  const hasAccess = await userHasEntitlement(email, slug);
 
   return (
-        <main style={{ padding: 24, maxWidth: 720, margin: "0 auto" }}>
-                <Link href="/agents">← All Agents</Link>Link>
-        
-              <h1 style={{ marginTop: 16 }}>{agent.name}</h1>h1>
-              <p style={{ color: "#555" }}>{agent.description}</p>p>
-        
-              <div style={{ marginTop: 8, fontSize: 13, color: "#888" }}>
-                      Available as: {agent.entitlementTypes.join(", ")}
-              </div>div>
-        
-          {entitled ? (
-                  <div
-                              style={{
-                                            marginTop: 32,
-                                            padding: 16,
-                                            background: "#f0fdf4",
-                                            borderRadius: 8,
-                                            border: "1px solid #bbf7d0",
-                              }}
-                            >
-                            <strong>Access granted.</strong>strong>
-                            <p style={{ marginTop: 8 }}>
-                              {/* TODO: render the actual agent UI / iframe / chat widget here */}
-                                        Agent UI for <em>{agent.name}</em>em> goes here.
-                            </p>p>
-                  </div>div>
-                ) : (
-                  <div
-                              style={{
-                                            marginTop: 32,
-                                            padding: 16,
-                                            background: "#fff7ed",
-                                            borderRadius: 8,
-                                            border: "1px solid #fed7aa",
-                              }}
-                            >
-                            <strong>Not yet unlocked.</strong>strong>
-                            <p style={{ marginTop: 8 }}>
-                                        Purchase access from our{" "}
-                                        <a
-                                                        href="https://teesandtruma.myshopify.com"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                      >
-                                                      TeesandTruma store
-                                        </a>a>{" "}
-                                        to use this agent.
-                            </p>p>
-                            <p style={{ fontSize: 13, color: "#888" }}>
-                                        SKU examples:&nbsp;
-                                        <code>AGENT_{slug.toUpperCase()}_LIFETIME</code>code>,&nbsp;
-                                        <code>AGENT_{slug.toUpperCase()}_SUB_MONTHLY</code>code>
-                            </p>p>
-                  </div>div>
-              )}
-        </main>main>
-      );
+          <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
+                    <p style={{ marginBottom: 16 }}>
+                                <Link href="/agents">← Back to Agents</Link>Link>
+                    </p>p>
+          
+                <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
+                    {agent.name}
+                </h1>h1>
+                <p style={{ color: "#666", marginBottom: 4 }}>{agent.description}</p>p>
+                <p style={{ fontSize: 13, color: "#999", marginBottom: 24 }}>
+                        Available as: {agent.entitlementTypes.join(" · ")}
+                </p>p>
+          
+              {hasAccess ? (
+                      <section
+                                    style={{
+                                                    border: "1px solid #bbf7d0",
+                                                    borderRadius: 12,
+                                                    padding: 20,
+                                                    background: "#f0fdf4",
+                                    }}
+                                  >
+                                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+                                            ✅ Access granted
+                                </h2>h2>
+                                <p style={{ marginBottom: 12 }}>
+                                            You have an active entitlement for <strong>{agent.name}</strong>strong>.
+                                </p>p>
+                          {/* TODO: Replace with actual agent UI / iframe / chat widget */}
+                                <p style={{ color: "#555" }}>Agent UI coming here.</p>p>
+                      </section>section>
+                    ) : (
+                      <section
+                                    style={{
+                                                    border: "1px solid #fed7aa",
+                                                    borderRadius: 12,
+                                                    padding: 20,
+                                                    background: "#fff7ed",
+                                    }}
+                                  >
+                                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+                                            🔒 Not yet unlocked
+                                </h2>h2>
+                                <p style={{ marginBottom: 4 }}>
+                                            A purchase is required for account:{" "}
+                                            <strong>{email}</strong>strong>
+                                </p>p>
+                                <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+                                            SKU examples:{" "}
+                                            <code>AGENT_{slug.replace(/-/g, "_").toUpperCase()}_LIFETIME</code>code>
+                                    {" · "}
+                                            <code>AGENT_{slug.replace(/-/g, "_").toUpperCase()}_SUB_MONTHLY</code>code>
+                                </p>p>
+                                <div style={{ display: "flex", gap: 16 }}>
+                                            <a
+                                                              href="https://teesandtruma.myshopify.com"
+                                                              target="_blank"
+                                                              rel="noopener noreferrer"
+                                                              style={{ textDecoration: "underline" }}
+                                                            >
+                                                          Buy on TeesandTruma store →
+                                            </a>a>
+                                            <Link href="/agents">Browse all agents</Link>Link>
+                                </div>div>
+                      </section>section>
+                )}
+          </main>main>
+        );
 }</Link>
