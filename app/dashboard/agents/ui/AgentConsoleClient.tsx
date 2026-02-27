@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 
 type RunMode = "route_only" | "execute";
 type AgentChoice =
@@ -42,9 +42,20 @@ type ApiError = {
 
 type ApiResponse = ApiOk | ApiNeedClarification | ApiError;
 
+type SavedRun = {
+  id: string;
+  agent_slug: string;
+  run_mode: string;
+  prompt: string;
+  response: ApiResponse;
+  via: string;
+  model: string | null;
+  created_at: string;
+};
+
 function Button(
   props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    variant?: "primary" | "ghost";
+    variant?: "primary" | "ghost" | "danger";
   }
 ) {
   const { variant = "primary", style, ...rest } = props;
@@ -55,10 +66,12 @@ function Button(
     cursor: "pointer",
     fontWeight: 600,
   };
-  const v: React.CSSProperties =
-    variant === "primary"
-      ? { background: "#111", color: "#fff", borderColor: "#111" }
-      : { background: "#fff", color: "#111" };
+  let v: React.CSSProperties = { background: "#fff", color: "#111" };
+  if (variant === "primary") {
+    v = { background: "#111", color: "#fff", borderColor: "#111" };
+  } else if (variant === "danger") {
+    v = { background: "#fee2e2", color: "#b91c1c", borderColor: "#fecaca" };
+  }
 
   return <button {...rest} style={{ ...base, ...v, ...style }} />;
 }
@@ -71,19 +84,20 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section
+    <div
       style={{
         border: "1px solid #ddd",
-        borderRadius: 14,
-        padding: 16,
+        borderRadius: 20,
         background: "#fff",
+        padding: 20,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>
+      <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 18 }}>
         {title}
       </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -95,10 +109,8 @@ function CopyButton({
   label?: string;
 }) {
   const [copied, setCopied] = useState(false);
-
   return (
     <Button
-      variant="ghost"
       onClick={async () => {
         await navigator.clipboard.writeText(getText());
         setCopied(true);
@@ -106,61 +118,127 @@ function CopyButton({
       }}
       style={{ fontSize: 13, padding: "8px 10px" }}
       type="button"
+      variant="ghost"
     >
       {copied ? "Copied ✓" : label}
     </Button>
   );
 }
 
-function toMarkdown(resp: ApiResponse): string {
+function toMarkdown(resp: ApiResponse, prompt?: string): string {
   if (!resp) return "";
+  const promptPart = prompt ? `# Prompt
+
+${prompt}
+
+` : "";
+
   if (resp.ok === false) {
     if ((resp as ApiNeedClarification).action === "needs_clarification") {
       const r = resp as ApiNeedClarification;
       return (
-        `# Needs clarification\n\nConfidence: ${r.confidence}\n\n## Questions\n` +
-        r.clarifying_questions.map((q) => `- ${q}`).join("\n") +
-        "\n"
+        promptPart +
+        `# Needs clarification
+
+Confidence: ${r.confidence}
+
+## Questions
+` +
+        r.clarifying_questions.map((q) => `- ${q}`).join("
+") +
+        "
+"
       );
     }
     const r = resp as ApiError;
     return (
-      `# Error\n\n${r.error}\n` +
-      (r.detail ? `\n\nDetails:\n${r.detail}` : "")
+      promptPart +
+      `# Error
+
+${r.error}
+` +
+      (r.detail ? `
+
+Details:
+${r.detail}` : "")
     );
   }
   const r = resp as ApiOk;
   const header =
-    `# Result\n\n- via: ${r.via}\n- agent: ${r.agent_slug}\n` +
-    `- confidence: ${typeof r.confidence === "number" ? r.confidence : "n/a"}\n` +
-    `- model: ${r.model || "n/a"}\n\n`;
+    promptPart +
+    `# Result
+
+- via: ${r.via}
+- agent: ${r.agent_slug}
+` +
+    `- confidence: ${typeof r.confidence === "number" ? r.confidence : "n/a"}
+` +
+    `- model: ${r.model || "n/a"}
+
+`;
+
   const body = r.output
-    ? `## Output\n\n\`\`\`json\n${JSON.stringify(r.output, null, 2)}\n\`\`\`\n`
+    ? `## Output
+
+\`\`\`json
+${JSON.stringify(r.output, null, 2)}
+\`\`\`
+`
     : "";
   const n8n =
     r.via === "n8n"
-      ? `## n8n\n\n\`\`\`json\n${JSON.stringify(r.result ?? r, null, 2)}\n\`\`\`\n`
+      ? `## n8n
+
+\`\`\`json
+${JSON.stringify(r.result ?? r, null, 2)}
+\`\`\`
+`
       : "";
+
   return header + body + n8n;
 }
 
 export default function AgentConsoleClient() {
-  const [agent, setAgent] = useState<AgentChoice>("auto");
+  const [agent, setAgent] = useState("auto");
   const [runMode, setRunMode] = useState<RunMode>("execute");
   const [text, setText] = useState(
     "Create an irresistible offer for a Shopify SEO service for small stores, $79/mo, goal: purchase."
   );
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [resp, setResp] = useState<ApiResponse | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+
+  // Saved runs state
+  const [saved, setSaved] = useState<SavedRun[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   const effectiveForce = useMemo(() => {
     if (agent === "auto") return null;
     return agent;
   }, [agent]);
 
+  async function refreshSaved() {
+    setLoadingSaved(true);
+    try {
+      const r = await fetch("/api/runs");
+      const j = await r.json();
+      if (j.ok) setSaved(j.runs);
+    } catch (e) {
+      console.error("Failed to fetch saved runs", e);
+    } finally {
+      setLoadingSaved(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshSaved();
+  }, []);
+
   async function run() {
     setLoading(true);
     setResp(null);
+    setActiveRunId(null);
     try {
       const res = await fetch("/api/agents", {
         method: "POST",
@@ -178,6 +256,48 @@ export default function AgentConsoleClient() {
       setResp({ ok: false, error: msg });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveRun() {
+    if (!resp) return;
+    setSaving(true);
+    try {
+      const r = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_slug: (resp as any).agent_slug || agent,
+          run_mode: runMode,
+          prompt: text,
+          response: resp,
+          via: (resp as any).via || "local",
+          model: (resp as any).model || null,
+        }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setActiveRunId(j.id);
+        refreshSaved();
+      }
+    } catch (e) {
+      alert("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteRun(id: string) {
+    if (!confirm("Delete this saved run?")) return;
+    try {
+      await fetch(`/api/runs?id=${id}`, { method: "DELETE" });
+      refreshSaved();
+      if (activeRunId === id) {
+        setResp(null);
+        setActiveRunId(null);
+      }
+    } catch (e) {
+      alert("Delete failed");
     }
   }
 
@@ -205,19 +325,24 @@ export default function AgentConsoleClient() {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "420px 1fr",
-        gap: 18,
+        gridTemplateColumns: "350px 1fr 300px",
+        gap: 24,
         alignItems: "start",
       }}
     >
-      <Card title="Run an agent">
-        <div style={{ display: "grid", gap: 10 }}>
+      {/* Left: Console */}
+      <Card title="Agent Console">
+        <div style={{ display: "grid", gap: 18 }}>
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Agent</span>
+            <span style={{ fontWeight: 800, fontSize: 14 }}>Agent</span>
             <select
               value={agent}
               onChange={(e) => setAgent(e.target.value as AgentChoice)}
-              style={{ padding: 10, borderRadius: 10, border: "1px solid #ccc" }}
+              style={{
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ccc",
+              }}
             >
               <option value="auto">Auto (router)</option>
               <option value="funnel-offer">funnel-offer</option>
@@ -228,11 +353,15 @@ export default function AgentConsoleClient() {
           </label>
 
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Mode</span>
+            <span style={{ fontWeight: 800, fontSize: 14 }}>Mode</span>
             <select
               value={runMode}
               onChange={(e) => setRunMode(e.target.value as RunMode)}
-              style={{ padding: 10, borderRadius: 10, border: "1px solid #ccc" }}
+              style={{
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ccc",
+              }}
             >
               <option value="execute">Execute</option>
               <option value="route_only">Route only</option>
@@ -240,7 +369,7 @@ export default function AgentConsoleClient() {
           </label>
 
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Prompt</span>
+            <span style={{ fontWeight: 800, fontSize: 14 }}>Prompt</span>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -264,6 +393,7 @@ export default function AgentConsoleClient() {
               onClick={() => {
                 setText("");
                 setResp(null);
+                setActiveRunId(null);
               }}
             >
               Clear
@@ -271,13 +401,14 @@ export default function AgentConsoleClient() {
           </div>
 
           <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.35 }}>
-            Tip: leave <b>Auto</b> to route intelligently. Use <b>Execute</b>{" "}
-            to run Offer/Pages/Emails. Use <b>Route only</b> to debug routing
-            &amp; payload.
+            Tip: leave <b>Auto</b> to route intelligently. Use <b>Execute</b> to
+            run Offer/Pages/Emails. Use <b>Route only</b> to debug routing &
+            payload.
           </div>
         </div>
       </Card>
 
+      {/* Middle: Results */}
       <div style={{ display: "grid", gap: 18 }}>
         <Card title="Result">
           {!resp ? (
@@ -291,6 +422,9 @@ export default function AgentConsoleClient() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     gap: 12,
+                    background: "#f9f9f9",
+                    padding: 12,
+                    borderRadius: 12,
                   }}
                 >
                   <div>
@@ -300,13 +434,23 @@ export default function AgentConsoleClient() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    {!activeRunId && resp.ok && (
+                      <Button
+                        onClick={saveRun}
+                        disabled={saving}
+                        variant="primary"
+                        style={{ fontSize: 13, padding: "8px 12px" }}
+                      >
+                        {saving ? "Saving..." : "Save run"}
+                      </Button>
+                    )}
                     <CopyButton
                       label="Copy JSON"
                       getText={() => JSON.stringify(resp, null, 2)}
                     />
                     <CopyButton
                       label="Copy Markdown"
-                      getText={() => toMarkdown(resp)}
+                      getText={() => toMarkdown(resp, text)}
                     />
                   </div>
                 </div>
@@ -325,7 +469,16 @@ export default function AgentConsoleClient() {
                 <summary style={{ cursor: "pointer", fontWeight: 700 }}>
                   Raw JSON
                 </summary>
-                <pre style={{ whiteSpace: "pre-wrap", marginTop: 10, fontSize: 12 }}>
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    marginTop: 10,
+                    fontSize: 12,
+                    background: "#f4f4f4",
+                    padding: 10,
+                    borderRadius: 8,
+                  }}
+                >
                   {JSON.stringify(resp, null, 2)}
                 </pre>
               </details>
@@ -333,6 +486,98 @@ export default function AgentConsoleClient() {
           )}
         </Card>
       </div>
+
+      {/* Right: Saved Runs */}
+      <Card title="Saved runs">
+        <div style={{ display: "grid", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ opacity: 0.75, fontSize: 13 }}>
+              {loadingSaved ? "Loading..." : `${saved.length} saved`}
+            </div>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={refreshSaved}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+            >
+              Refresh
+            </Button>
+          </div>
+
+          {saved.length === 0 ? (
+            <div style={{ opacity: 0.7, fontSize: 13 }}>
+              No saved runs yet. Run and save to see them here.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {saved.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: "grid",
+                    gap: 6,
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid #eee",
+                    background: activeRunId === item.id ? "#f0f7ff" : "#fff",
+                    borderColor: activeRunId === item.id ? "#bfdbfe" : "#eee",
+                  }}
+                >
+                  <div
+                    onClick={() => {
+                      setResp(item.response);
+                      setText(item.prompt);
+                      setAgent(item.agent_slug);
+                      setRunMode(item.run_mode as RunMode);
+                      setActiveRunId(item.id);
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div style={{ fontWeight: 800, fontSize: 14 }}>
+                      {item.agent_slug}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        opacity: 0.7,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {item.prompt}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ fontSize: 10, opacity: 0.5 }}>
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </span>
+                    <Button
+                      variant="danger"
+                      onClick={() => deleteRun(item.id)}
+                      style={{ fontSize: 10, padding: "2px 6px" }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -350,7 +595,8 @@ function ErrorView({ resp }: { resp: ApiError }) {
       <div style={{ fontWeight: 900, marginBottom: 6 }}>Error</div>
       <div
         style={{
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
           fontSize: 13,
         }}
       >
@@ -375,12 +621,8 @@ function ErrorView({ resp }: { resp: ApiError }) {
 
 function ClarificationView({ resp }: { resp: ApiNeedClarification }) {
   return (
-    <div
-      style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}
-    >
-      <div style={{ fontWeight: 900, marginBottom: 6 }}>
-        Needs clarification
-      </div>
+    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
+      <div style={{ fontWeight: 900, marginBottom: 6 }}>Needs clarification</div>
       {resp.intent_summary && (
         <div style={{ opacity: 0.8, marginBottom: 10 }}>
           {resp.intent_summary}
@@ -404,12 +646,8 @@ function ClarificationView({ resp }: { resp: ApiNeedClarification }) {
 function SuccessView({ resp }: { resp: ApiOk }) {
   if (resp.via === "n8n") {
     return (
-      <div
-        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 6 }}>
-          Executed via n8n
-        </div>
+      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
+        <div style={{ fontWeight: 900, marginBottom: 6 }}>Executed via n8n</div>
         <div style={{ opacity: 0.8, marginBottom: 10 }}>
           Agent: <b>{resp.agent_slug}</b>
           {typeof resp.confidence === "number"
@@ -424,14 +662,14 @@ function SuccessView({ resp }: { resp: ApiOk }) {
   }
 
   const out = resp.output;
-
   if (!out || typeof out !== "object") {
     return <div style={{ opacity: 0.7 }}>No structured output returned.</div>;
   }
 
-  if (resp.agent_slug === "funnel-offer") return <OfferView out={out} />;
-  if (resp.agent_slug === "funnel-pages") return <PagesView out={out} />;
-  if (resp.agent_slug === "funnel-emails") return <EmailsView out={out} />;
+  if (resp.agent_slug === "funnel-offer") return <OfferView out={out as any} />;
+  if (resp.agent_slug === "funnel-pages") return <PagesView out={out as any} />;
+  if (resp.agent_slug === "funnel-emails")
+    return <EmailsView out={out as any} />;
 
   return (
     <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: 0 }}>
@@ -440,13 +678,13 @@ function SuccessView({ resp }: { resp: ApiOk }) {
   );
 }
 
-function OfferView({ out }: { out: Record<string, unknown> }) {
-  const pos = (out.positioning as Record<string, string>) ?? {};
-  const pricing = (out.pricing as Record<string, unknown>) ?? {};
-  const cta = (out.cta as Record<string, string>) ?? {};
-  const hooks = Array.isArray(out.hooks) ? (out.hooks as string[]) : [];
+function OfferView({ out }: { out: any }) {
+  const pos = out.positioning ?? {};
+  const pricing = out.pricing ?? {};
+  const cta = out.cta ?? {};
+  const hooks = Array.isArray(out.hooks) ? out.hooks : [];
   const objections = Array.isArray(out.objections_and_answers)
-    ? (out.objections_and_answers as { objection: string; answer: string }[])
+    ? out.objections_and_answers
     : [];
 
   return (
@@ -461,7 +699,7 @@ function OfferView({ out }: { out: Record<string, unknown> }) {
       <div style={{ display: "grid", gap: 6 }}>
         <div style={{ fontWeight: 900 }}>Positioning</div>
         <div>
-          <b>Who it&apos;s for:</b> {pos.who_its_for}
+          <b>Who it's for:</b> {pos.who_its_for}
         </div>
         <div>
           <b>Promise:</b> {pos.core_promise}
@@ -477,10 +715,9 @@ function OfferView({ out }: { out: Record<string, unknown> }) {
           <b>Recommended:</b> {String(pricing.recommended ?? "")}
         </div>
         {Array.isArray(pricing.alternatives) &&
-          (pricing.alternatives as string[]).length > 0 && (
+          pricing.alternatives.length > 0 && (
             <div>
-              <b>Alternatives:</b>{" "}
-              {(pricing.alternatives as string[]).join(" • ")}
+              <b>Alternatives:</b> {pricing.alternatives.join(" • ")}
             </div>
           )}
         <div>
@@ -492,7 +729,7 @@ function OfferView({ out }: { out: Record<string, unknown> }) {
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Hooks</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {hooks.slice(0, 12).map((h, i) => (
+            {hooks.slice(0, 12).map((h: any, i: any) => (
               <li key={i} style={{ marginBottom: 4 }}>
                 {h}
               </li>
@@ -505,7 +742,7 @@ function OfferView({ out }: { out: Record<string, unknown> }) {
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Objections</div>
           <div style={{ display: "grid", gap: 10 }}>
-            {objections.slice(0, 6).map((x, i) => (
+            {objections.slice(0, 6).map((x: any, i: any) => (
               <div
                 key={i}
                 style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}
@@ -531,17 +768,11 @@ function OfferView({ out }: { out: Record<string, unknown> }) {
   );
 }
 
-function PagesView({ out }: { out: Record<string, unknown> }) {
-  const cta = (out.cta as Record<string, string>) ?? {};
-  const heroBullets = Array.isArray(out.hero_bullets)
-    ? (out.hero_bullets as string[])
-    : [];
-  const sections = Array.isArray(out.sections)
-    ? (out.sections as { title: string; body: string }[])
-    : [];
-  const faq = Array.isArray(out.faq)
-    ? (out.faq as { q: string; a: string }[])
-    : [];
+function PagesView({ out }: { out: any }) {
+  const cta = out.cta ?? {};
+  const heroBullets = Array.isArray(out.hero_bullets) ? out.hero_bullets : [];
+  const sections = Array.isArray(out.sections) ? out.sections : [];
+  const faq = Array.isArray(out.faq) ? out.faq : [];
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -556,7 +787,7 @@ function PagesView({ out }: { out: Record<string, unknown> }) {
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Hero bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {heroBullets.slice(0, 8).map((b, i) => (
+            {heroBullets.slice(0, 8).map((b: any, i: any) => (
               <li key={i} style={{ marginBottom: 4 }}>
                 {b}
               </li>
@@ -568,7 +799,7 @@ function PagesView({ out }: { out: Record<string, unknown> }) {
       {sections.length > 0 && (
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900 }}>Sections</div>
-          {sections.map((s, i) => (
+          {sections.map((s: any, i: any) => (
             <div
               key={i}
               style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
@@ -583,7 +814,7 @@ function PagesView({ out }: { out: Record<string, unknown> }) {
       {faq.length > 0 && (
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900 }}>FAQ</div>
-          {faq.map((f, i) => (
+          {faq.map((f: any, i: any) => (
             <div
               key={i}
               style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
@@ -608,16 +839,8 @@ function PagesView({ out }: { out: Record<string, unknown> }) {
   );
 }
 
-function EmailsView({ out }: { out: Record<string, unknown> }) {
-  const emails = Array.isArray(out.emails)
-    ? (out.emails as {
-        email_number: number;
-        subject: string;
-        preview: string;
-        body: string;
-        cta: string;
-      }[])
-    : [];
+function EmailsView({ out }: { out: any }) {
+  const emails = Array.isArray(out.emails) ? out.emails : [];
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -627,7 +850,7 @@ function EmailsView({ out }: { out: Record<string, unknown> }) {
 
       {emails.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
-          {emails.map((e, i) => (
+          {emails.map((e: any, i: any) => (
             <div
               key={i}
               style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
@@ -646,14 +869,18 @@ function EmailsView({ out }: { out: Record<string, unknown> }) {
                 <CopyButton
                   label="Copy Email"
                   getText={() =>
-                    `Subject: ${e.subject}\nPreview: ${e.preview}\n\n${e.body}\n\nCTA: ${e.cta}\n`
+                    `Subject: ${e.subject}
+Preview: ${e.preview}
+
+${e.body}
+
+CTA: ${e.cta}
+`
                   }
                 />
               </div>
               <div style={{ opacity: 0.7, marginTop: 6 }}>{e.preview}</div>
-              <div style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
-                {e.body}
-              </div>
+              <div style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>{e.body}</div>
               <div style={{ marginTop: 10 }}>
                 <b>CTA:</b> {e.cta}
               </div>
