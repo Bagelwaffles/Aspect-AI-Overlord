@@ -1,69 +1,103 @@
 /**
- * /app/api/shopify/webhooks/orders-paid/route.ts
+ * app/api/shopify/webhooks/orders-paid/route.ts
  *
- * Shopify "orders/paid" webhook handler (server-only).
+ * Shopify orders/paid webhook — idempotent, HMAC-verified.
+ * Money instantly turns into access via lib/entitlements.ts (Redis).
  *
- * Required env vars (see .env.example):
- *   SHOPIFY_WEBHOOK_SECRET   – used to verify HMAC-SHA256 signature
- *
- * SKU convention for agent entitlements:
- *   AGENT_<slug>_LIFETIME        – one-time lifetime purchase
- *   AGENT_<slug>_SUB_MONTHLY    – monthly subscription
- *   AGENT_<slug>_SUB_ANNUAL     – annual subscription
- *   AGENT_USAGE_<slug>_<units>  – usage-based add-on
+ * Required env vars:
+ *   SHOPIFY_WEBHOOK_SECRET          – from Shopify Partners / Webhooks page
+ *   KV_REST_API_URL                 – Vercel KV  (or UPSTASH_REDIS_REST_URL)
+ *   KV_REST_API_TOKEN               – Vercel KV  (or UPSTASH_REDIS_REST_TOKEN)
  */
 
-import { createHmac, timingSafeEqual } from "crypto";
+import crypto from "crypto";
+import { NextResponse } from "next/server";
+import { grantEntitlement, markOrderProcessed } from "@/lib/entitlements";
 
-/** Stub: replace with your real entitlement store (DB, Redis, etc.) */
-async function grantEntitlement(
-    customerId: string,
-    sku: string
-  ): Promise<void> {
-    console.log(`[entitlement] grant customer=${customerId} sku=${sku}`);
-    // TODO: persist to DB / KV store
+// Force Node.js runtime so crypto.timingSafeEqual is available
+export const runtime = "nodejs";
+
+function verifyShopifyHmac(
+      rawBody: string,
+      hmacHeader: string | null,
+      secret: string
+    ): boolean {
+      if (!hmacHeader || !secret) return false;
+      const digest = crypto
+        .createHmac("sha256", secret)
+        .update(rawBody, "utf8")
+        .digest("base64");
+      const a = Buffer.from(digest);
+      const b = Buffer.from(hmacHeader);
+      // timingSafeEqual requires same-length buffers
+  if (a.length !== b.length) return false;
+      return crypto.timingSafeEqual(a, b);
 }
 
-function verifyShopifyHmac(rawBody: string, hmacHeader: string): boolean {
-    const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-    if (!secret) {
-          console.error("[shopify-webhook] SHOPIFY_WEBHOOK_SECRET is not set");
-          return false;
-    }
-    const digest = createHmac("sha256", secret)
-      .update(rawBody, "utf8")
-      .digest("base64");
-    try {
-          return timingSafeEqual(Buffer.from(digest), Buffer.from(hmacHeader));
-    } catch {
-          return false;
-    }
-}
+export async function POST(request: Request) {
+      const secret = process.env.SHOPIFY_WEBHOOK_SECRET ?? "";
+      const hmac = request.headers.get("x-shopify-hmac-sha256");
 
-export async function POST(request: Request): Promise<Response> {
-    const hmacHeader = request.headers.get("x-shopify-hmac-sha256") ?? "";
-    const rawBody = await request.text();
+  // Must read raw body BEFORE any JSON parsing to preserve bytes for HMAC
+  const rawBody = await request.text();
 
-  if (!verifyShopifyHmac(rawBody, hmacHeader)) {
-        return new Response("Unauthorized", { status: 401 });
+  if (!verifyShopifyHmac(rawBody, hmac, secret)) {
+          return NextResponse.json({ ok: false, error: "invalid_hmac" }, { status: 401 });
   }
 
-  let order: Record<string, unknown>;
-    try {
-          order = JSON.parse(rawBody) as Record<string, unknown>;
-    } catch {
-          return new Response("Bad Request", { status: 400 });
-    }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let payload: any;
+      try {
+              payload = JSON.parse(rawBody);
+      } catch {
+              return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+      }
 
-  const customerId = String(order.customer_id ?? order.id ?? "unknown");
-    const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+  // Shopify order payload: id (number), email (string), customer.email, line_items[]
+  const orderId = String(payload?.id ?? "").trim();
+      const email =
+              String(payload?.email ?? "").trim() ||
+              String(payload?.customer?.email ?? "").trim();
 
-  for (const item of lineItems as Array<Record<string, unknown>>) {
-        const sku = String(item.sku ?? "");
-        if (!sku.startsWith("AGENT_")) continue;
-
-      await grantEntitlement(customerId, sku);
+  if (!orderId) {
+          return NextResponse.json({ ok: false, error: "missing_order_id" }, { status: 400 });
   }
 
-  return new Response("OK", { status: 200 });
+  // Idempotency: process each Shopify order only once (atomic Redis SADD)
+  const firstTime = await markOrderProcessed(orderId);
+      if (!firstTime) {
+              // Already processed — ACK so Shopify stops retrying
+        return NextResponse.json({ ok: true, deduped: true });
+      }
+
+  if (!email) {
+          // No email → can't grant entitlements, but still ACK to prevent Shopify retry loop
+        console.warn("[orders-paid] no email on order — cannot grant entitlements", { orderId });
+          return NextResponse.json({ ok: true, warning: "missing_email" });
+  }
+
+  const lineItems: Array<{ sku?: string }> = Array.isArray(payload?.line_items)
+        ? payload.line_items
+          : [];
+
+  const agentSkus = lineItems
+        .map((item) => String(item?.sku ?? "").trim())
+        .filter((sku) => sku.toUpperCase().startsWith("AGENT_"));
+
+  if (agentSkus.length === 0) {
+          return NextResponse.json({ ok: true, orderId, granted: 0 });
+  }
+
+  let granted = 0;
+      for (const sku of agentSkus) {
+              try {
+                        const result = await grantEntitlement(email, sku, { orderId });
+                        if (result.ok) granted++;
+              } catch (err) {
+                        console.error("[orders-paid] grantEntitlement failed", { orderId, email, sku, err });
+                        // Continue processing remaining SKUs — don't let one failure block the rest
+              }
+      }
+
+  return NextResponse.json({ ok: true, orderId, granted });
 }
