@@ -10,6 +10,11 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { routeToAgent, ALLOWED_SLUGS } from "@/lib/ai/agentRouter";
 import { userHasEntitlement } from "@/lib/entitlements";
 import { OpenRouterMessage } from "@/lib/openrouter";
+import {
+  executeAgent,
+  EXECUTABLE_AGENT_SLUGS,
+  type ExecutableAgentSlug,
+} from "@/lib/agents/execute";
 
 // ---------------------------------------------------------------------------
 // Agents that are always free (no entitlement check required)
@@ -177,12 +182,44 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 7b. Local agent execution (stub — replace with real agent calls)
+  // 7b. Real execution for implemented agents
+  if (EXECUTABLE_AGENT_SLUGS.includes(agentSlug as ExecutableAgentSlug)) {
+    const exec = await executeAgent(
+      agentSlug as ExecutableAgentSlug,
+      routeResult?.payload ?? {}
+    );
+
+    if (!exec.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "agent_execution_failed",
+          agent_slug: agentSlug,
+          detail: exec.error,
+        },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      via: "local",
+      agent_slug: agentSlug,
+      confidence: routeResult?.confidence ?? 1,
+      intent_summary: routeResult?.intent_summary ?? "Forced route",
+      model: exec.model,
+      output: exec.output,
+    });
+  }
+
+  // 7c. Fallback stub for not-yet-implemented agents
   return NextResponse.json({
     ok: true,
     via: "local",
     agent_slug: agentSlug,
+    confidence: routeResult?.confidence ?? 1,
+    intent_summary: routeResult?.intent_summary ?? "Forced route",
     payload: routeResult?.payload ?? {},
-    message: "Execution stub — wire real agent logic here",
+    message: "Execution stub",
   });
 }
