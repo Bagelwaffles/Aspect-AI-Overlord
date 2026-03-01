@@ -121,4 +121,12 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Link color + selection highlight */
+  a {
+    @apply text-foreground;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 30%, white);
+  }
 }
