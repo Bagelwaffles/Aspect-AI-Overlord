@@ -22,7 +22,6 @@ type ApiOk = {
   payload?: unknown;
   message?: string;
 };
-
 type ApiNeedClarification = {
   ok: false;
   action: "needs_clarification";
@@ -32,16 +31,13 @@ type ApiNeedClarification = {
   agent_slug?: string;
   payload?: unknown;
 };
-
 type ApiError = {
   ok: false;
   error: string;
   agent_slug?: string;
   detail?: string;
 };
-
 type ApiResponse = ApiOk | ApiNeedClarification | ApiError;
-
 type SavedRun = {
   id: string;
   agent_slug: string;
@@ -72,7 +68,6 @@ function Button(
   } else if (variant === "danger") {
     v = { background: "#fee2e2", color: "#b91c1c", borderColor: "#fecaca" };
   }
-
   return <button {...rest} style={{ ...base, ...v, ...style }} />;
 }
 
@@ -120,81 +115,45 @@ function CopyButton({
       type="button"
       variant="ghost"
     >
-      {copied ? "Copied ✓" : label}
+      {copied ? "Copied \u2713" : label}
     </Button>
   );
 }
 
 function toMarkdown(resp: ApiResponse, prompt?: string): string {
   if (!resp) return "";
-  const promptPart = prompt ? `# Prompt
-
-${prompt}
-
-` : "";
+  const promptPart = prompt ? `# Prompt\n\n${prompt}\n\n` : "";
 
   if (resp.ok === false) {
     if ((resp as ApiNeedClarification).action === "needs_clarification") {
       const r = resp as ApiNeedClarification;
       return (
         promptPart +
-        `# Needs clarification
-
-Confidence: ${r.confidence}
-
-## Questions
-` +
-        r.clarifying_questions.map((q) => `- ${q}`).join("
-") +
-        "
-"
+        `# Needs clarification\n\nConfidence: ${r.confidence}\n\n## Questions\n\n` +
+        r.clarifying_questions.map((q) => `- ${q}`).join("\n") +
+        "\n"
       );
     }
     const r = resp as ApiError;
     return (
       promptPart +
-      `# Error
-
-${r.error}
-` +
-      (r.detail ? `
-
-Details:
-${r.detail}` : "")
+      `# Error\n\n${r.error}\n` +
+      (r.detail ? `\nDetails:\n${r.detail}` : "")
     );
   }
   const r = resp as ApiOk;
   const header =
     promptPart +
-    `# Result
-
-- via: ${r.via}
-- agent: ${r.agent_slug}
-` +
-    `- confidence: ${typeof r.confidence === "number" ? r.confidence : "n/a"}
-` +
-    `- model: ${r.model || "n/a"}
-
-`;
-
+    `# Result\n- via: ${r.via}\n- agent: ${r.agent_slug}\n` +
+    `- confidence: ${typeof r.confidence === "number" ? r.confidence : "n/a"}\n` +
+    `- model: ${r.model || "n/a"}\n\n`;
   const body = r.output
-    ? `## Output
-
-\`\`\`json
-${JSON.stringify(r.output, null, 2)}
-\`\`\`
-`
+    ? `## Output\n\`\`\`json\n${JSON.stringify(r.output, null, 2)}\n\`\`\`\n\n`
     : "";
   const n8n =
     r.via === "n8n"
-      ? `## n8n
-
-\`\`\`json
-${JSON.stringify(r.result ?? r, null, 2)}
-\`\`\`
-`
+      ? `## n8n\n\`\`\`json\n${JSON.stringify(r.result ?? r, null, 2)}\n\`\`\`\n\n`
       : "";
-
   return header + body + n8n;
 }
 
@@ -209,7 +168,6 @@ export default function AgentConsoleClient() {
   const [resp, setResp] = useState<ApiResponse | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
-  // Saved runs state
   const [saved, setSaved] = useState<SavedRun[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
 
@@ -351,7 +309,6 @@ export default function AgentConsoleClient() {
               <option value="n8n">n8n</option>
             </select>
           </label>
-
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontWeight: 800, fontSize: 14 }}>Mode</span>
             <select
@@ -367,7 +324,6 @@ export default function AgentConsoleClient() {
               <option value="route_only">Route only</option>
             </select>
           </label>
-
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontWeight: 800, fontSize: 14 }}>Prompt</span>
             <textarea
@@ -382,7 +338,6 @@ export default function AgentConsoleClient() {
               }}
             />
           </label>
-
           <div style={{ display: "flex", gap: 10 }}>
             <Button onClick={run} disabled={loading} style={{ flex: 1 }}>
               {loading ? "Running..." : "Run"}
@@ -399,11 +354,9 @@ export default function AgentConsoleClient() {
               Clear
             </Button>
           </div>
-
           <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.35 }}>
-            Tip: leave <b>Auto</b> to route intelligently. Use <b>Execute</b> to
-            run Offer/Pages/Emails. Use <b>Route only</b> to debug routing &
-            payload.
+            Tip: leave <b>Auto</b> to route intelligently. Use <b>Execute</b>{" "}
+            to run Offer/Pages/Emails. Use <b>Route only</b> to debug routing.
           </div>
         </div>
       </Card>
@@ -455,7 +408,6 @@ export default function AgentConsoleClient() {
                   </div>
                 </div>
               )}
-
               {(resp as ApiNeedClarification).action ===
               "needs_clarification" ? (
                 <ClarificationView resp={resp as ApiNeedClarification} />
@@ -464,7 +416,6 @@ export default function AgentConsoleClient() {
               ) : (
                 <SuccessView resp={resp as ApiOk} />
               )}
-
               <details style={{ marginTop: 4 }}>
                 <summary style={{ cursor: "pointer", fontWeight: 700 }}>
                   Raw JSON
@@ -509,7 +460,6 @@ export default function AgentConsoleClient() {
               Refresh
             </Button>
           </div>
-
           {saved.length === 0 ? (
             <div style={{ opacity: 0.7, fontSize: 13 }}>
               No saved runs yet. Run and save to see them here.
@@ -526,7 +476,8 @@ export default function AgentConsoleClient() {
                     borderRadius: 12,
                     border: "1px solid #eee",
                     background: activeRunId === item.id ? "#f0f7ff" : "#fff",
-                    borderColor: activeRunId === item.id ? "#bfdbfe" : "#eee",
+                    borderColor:
+                      activeRunId === item.id ? "#bfdbfe" : "#eee",
                   }}
                 >
                   <div
@@ -595,8 +546,7 @@ function ErrorView({ resp }: { resp: ApiError }) {
       <div style={{ fontWeight: 900, marginBottom: 6 }}>Error</div>
       <div
         style={{
-          fontFamily:
-            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
           fontSize: 13,
         }}
       >
@@ -622,7 +572,9 @@ function ErrorView({ resp }: { resp: ApiError }) {
 function ClarificationView({ resp }: { resp: ApiNeedClarification }) {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
-      <div style={{ fontWeight: 900, marginBottom: 6 }}>Needs clarification</div>
+      <div style={{ fontWeight: 900, marginBottom: 6 }}>
+        Needs clarification
+      </div>
       {resp.intent_summary && (
         <div style={{ opacity: 0.8, marginBottom: 10 }}>
           {resp.intent_summary}
@@ -636,8 +588,7 @@ function ClarificationView({ resp }: { resp: ApiNeedClarification }) {
         ))}
       </ul>
       <div style={{ opacity: 0.7, fontSize: 12, marginTop: 10 }}>
-        Answer these in your prompt and run again. The router will raise
-        confidence.
+        Answer these in your prompt and run again.
       </div>
     </div>
   );
@@ -660,17 +611,13 @@ function SuccessView({ resp }: { resp: ApiOk }) {
       </div>
     );
   }
-
   const out = resp.output;
   if (!out || typeof out !== "object") {
     return <div style={{ opacity: 0.7 }}>No structured output returned.</div>;
   }
-
   if (resp.agent_slug === "funnel-offer") return <OfferView out={out as any} />;
   if (resp.agent_slug === "funnel-pages") return <PagesView out={out as any} />;
-  if (resp.agent_slug === "funnel-emails")
-    return <EmailsView out={out as any} />;
-
+  if (resp.agent_slug === "funnel-emails") return <EmailsView out={out as any} />;
   return (
     <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: 0 }}>
       {JSON.stringify(resp.output, null, 2)}
@@ -686,7 +633,6 @@ function OfferView({ out }: { out: any }) {
   const objections = Array.isArray(out.objections_and_answers)
     ? out.objections_and_answers
     : [];
-
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gap: 4 }}>
@@ -695,58 +641,36 @@ function OfferView({ out }: { out: any }) {
         </div>
         <div style={{ opacity: 0.8 }}>{pos.one_liner}</div>
       </div>
-
       <div style={{ display: "grid", gap: 6 }}>
         <div style={{ fontWeight: 900 }}>Positioning</div>
-        <div>
-          <b>Who it's for:</b> {pos.who_its_for}
-        </div>
-        <div>
-          <b>Promise:</b> {pos.core_promise}
-        </div>
-        <div>
-          <b>Unique mechanism:</b> {pos.unique_mechanism}
-        </div>
+        <div><b>Who it is for:</b> {pos.who_its_for}</div>
+        <div><b>Promise:</b> {pos.core_promise}</div>
+        <div><b>Unique mechanism:</b> {pos.unique_mechanism}</div>
       </div>
-
       <div style={{ display: "grid", gap: 6 }}>
         <div style={{ fontWeight: 900 }}>Pricing</div>
-        <div>
-          <b>Recommended:</b> {String(pricing.recommended ?? "")}
-        </div>
-        {Array.isArray(pricing.alternatives) &&
-          pricing.alternatives.length > 0 && (
-            <div>
-              <b>Alternatives:</b> {pricing.alternatives.join(" • ")}
-            </div>
-          )}
-        <div>
-          <b>Guarantee:</b> {String(pricing.guarantee ?? "")}
-        </div>
+        <div><b>Recommended:</b> {String(pricing.recommended ?? "")}</div>
+        {Array.isArray(pricing.alternatives) && pricing.alternatives.length > 0 && (
+          <div><b>Alternatives:</b> {pricing.alternatives.join(" • ")}</div>
+        )}
+        <div><b>Guarantee:</b> {String(pricing.guarantee ?? "")}</div>
       </div>
-
       {hooks.length > 0 && (
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Hooks</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {hooks.slice(0, 12).map((h: any, i: any) => (
-              <li key={i} style={{ marginBottom: 4 }}>
-                {h}
-              </li>
+              <li key={i} style={{ marginBottom: 4 }}>{h}</li>
             ))}
           </ul>
         </div>
       )}
-
       {objections.length > 0 && (
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Objections</div>
           <div style={{ display: "grid", gap: 10 }}>
             {objections.slice(0, 6).map((x: any, i: any) => (
-              <div
-                key={i}
-                style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}
-              >
+              <div key={i} style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}>
                 <div style={{ fontWeight: 800 }}>{x.objection}</div>
                 <div style={{ opacity: 0.85, marginTop: 4 }}>{x.answer}</div>
               </div>
@@ -754,15 +678,10 @@ function OfferView({ out }: { out: any }) {
           </div>
         </div>
       )}
-
       <div style={{ display: "grid", gap: 6 }}>
         <div style={{ fontWeight: 900 }}>CTAs</div>
-        <div>
-          <b>Primary:</b> {cta.primary}
-        </div>
-        <div>
-          <b>Secondary:</b> {cta.secondary}
-        </div>
+        <div><b>Primary:</b> {cta.primary}</div>
+        <div><b>Secondary:</b> {cta.secondary}</div>
       </div>
     </div>
   );
@@ -773,67 +692,48 @@ function PagesView({ out }: { out: any }) {
   const heroBullets = Array.isArray(out.hero_bullets) ? out.hero_bullets : [];
   const sections = Array.isArray(out.sections) ? out.sections : [];
   const faq = Array.isArray(out.faq) ? out.faq : [];
-
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gap: 4 }}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>
-          {String(out.headline ?? "")}
-        </div>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>{String(out.headline ?? "")}</div>
         <div style={{ opacity: 0.85 }}>{String(out.subheadline ?? "")}</div>
       </div>
-
       {heroBullets.length > 0 && (
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 900 }}>Hero bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {heroBullets.slice(0, 8).map((b: any, i: any) => (
-              <li key={i} style={{ marginBottom: 4 }}>
-                {b}
-              </li>
+              <li key={i} style={{ marginBottom: 4 }}>{b}</li>
             ))}
           </ul>
         </div>
       )}
-
       {sections.length > 0 && (
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900 }}>Sections</div>
           {sections.map((s: any, i: any) => (
-            <div
-              key={i}
-              style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
-            >
+            <div key={i} style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 6 }}>{s.title}</div>
               <div style={{ opacity: 0.9, whiteSpace: "pre-wrap" }}>{s.body}</div>
             </div>
           ))}
         </div>
       )}
-
       {faq.length > 0 && (
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900 }}>FAQ</div>
           {faq.map((f: any, i: any) => (
-            <div
-              key={i}
-              style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
-            >
+            <div key={i} style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
               <div style={{ fontWeight: 900 }}>{f.q}</div>
               <div style={{ opacity: 0.85, marginTop: 6 }}>{f.a}</div>
             </div>
           ))}
         </div>
       )}
-
       <div style={{ display: "grid", gap: 6 }}>
         <div style={{ fontWeight: 900 }}>CTAs</div>
-        <div>
-          <b>Primary:</b> {cta.primary}
-        </div>
-        <div>
-          <b>Secondary:</b> {cta.secondary}
-        </div>
+        <div><b>Primary:</b> {cta.primary}</div>
+        <div><b>Secondary:</b> {cta.secondary}</div>
       </div>
     </div>
   );
@@ -841,49 +741,29 @@ function PagesView({ out }: { out: any }) {
 
 function EmailsView({ out }: { out: any }) {
   const emails = Array.isArray(out.emails) ? out.emails : [];
-
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ fontSize: 18, fontWeight: 900 }}>
         {String(out.sequence_name ?? "Email Sequence")}
       </div>
-
       {emails.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
           {emails.map((e: any, i: any) => (
-            <div
-              key={i}
-              style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "center",
-                }}
-              >
+            <div key={i} style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div style={{ fontWeight: 900 }}>
                   Email {e.email_number}: {e.subject}
                 </div>
                 <CopyButton
                   label="Copy Email"
                   getText={() =>
-                    `Subject: ${e.subject}
-Preview: ${e.preview}
-
-${e.body}
-
-CTA: ${e.cta}
-`
+                    `Subject: ${e.subject}\nPreview: ${e.preview}\n\n${e.body}\n\nCTA: ${e.cta}\n`
                   }
                 />
               </div>
               <div style={{ opacity: 0.7, marginTop: 6 }}>{e.preview}</div>
               <div style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>{e.body}</div>
-              <div style={{ marginTop: 10 }}>
-                <b>CTA:</b> {e.cta}
-              </div>
+              <div style={{ marginTop: 10 }}><b>CTA:</b> {e.cta}</div>
             </div>
           ))}
         </div>
