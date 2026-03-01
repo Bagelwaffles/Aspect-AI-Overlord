@@ -1,28 +1,12 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-  },
-  async redirects() {
-    return [
-      {
-        source: "/privacy",
-        destination: "/privacy-policy",
-        permanent: true,
-      },
-      {
-        source: "/privacy-policy.html",
-        destination: "/privacy-policy",
-        permanent: true,
-      },
-    ];
-  },
-}
+import path from "path";
 
-export default nextConfig
+const nextConfig = {
+    typescript: { ignoreBuildErrors: true },
+    eslint: { ignoreDuringBuilds: true },
+    webpack: (config) => {
+          config.resolve.alias["@"] = path.resolve("./");
+          return config;
+    },
+};
+
+export default nextConfig;
