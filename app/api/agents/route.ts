@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { routeToAgent, ALLOWED_SLUGS } from "@/lib/ai/agentRouter";
 import { userHasEntitlement } from "@/lib/entitlements";
 import { OpenRouterMessage } from "@/lib/openrouter";
