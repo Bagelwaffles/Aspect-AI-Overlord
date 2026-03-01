@@ -10,9 +10,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { AGENT_BY_SLUG } from "@/lib/agents/registry";
 import { authOptions } from "@/lib/auth";
+import { userHasEntitlement } from "@/lib/entitlements";
 
 // Never statically cache — session + entitlements must be fresh every request
 export const dynamic = "force-dynamic";
