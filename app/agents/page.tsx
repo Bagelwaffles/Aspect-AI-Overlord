@@ -1,9 +1,4 @@
-/**
- * /app/agents/page.tsx
- * Public listing of all available agents.
- * Individual agent pages (/app/agents/[slug]) are protected.
- */
-
+// app/agents/page.tsx
 import Link from "next/link";
 import { AGENT_REGISTRY } from "@/lib/agents/registry";
 
@@ -14,59 +9,71 @@ export const metadata = {
 
 export default function AgentsPage() {
   return (
-    <main style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <h1>AI Agents</h1>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight">AI Agents</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Browse our specialist AI marketing agents. Purchase lifetime access, a subscription,
+          or a usage pack from{" "}
+          <a
+            href="https://teesandtruma.myshopify.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-zinc-900 underline underline-offset-4"
+          >
+            TeesandTruma
+          </a>{" "}
+          then return here to unlock them.
+        </p>
+      </div>
 
-      <p style={{ color: "#666", marginBottom: 32 }}>
-        Browse our 13 specialist AI marketing agents. Purchase lifetime access, a
-        subscription, or a usage pack from our{" "}
-        <a
-          href="https://teesandtruma.myshopify.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          TeesandTruma store
-        </a>
-        , then return here to unlock them.
-      </p>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: 16,
-        }}
-      >
+      {/* Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {AGENT_REGISTRY.map((agent) => (
           <Link
             key={agent.slug}
             href={`/agents/${agent.slug}`}
-            style={{
-              display: "block",
-              border: "1px solid #e2e8f0",
-              borderRadius: 8,
-              padding: 16,
-              textDecoration: "none",
-              color: "inherit",
-              transition: "box-shadow 0.15s",
-            }}
+            className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <h2 style={{ fontSize: 16, margin: "0 0 8px" }}>{agent.name}</h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-base font-semibold leading-snug">
+                {agent.name}
+              </h2>
+              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600">
+                View
+              </span>
+            </div>
 
-            <p style={{ fontSize: 14, color: "#555", margin: 0 }}>
+            <p className="mt-2 text-sm text-zinc-600 line-clamp-3">
               {agent.description}
             </p>
 
-            <div style={{ marginTop: 12, fontSize: 12, color: "#888" }}>
-              {agent.entitlementTypes.join(" · ")}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {agent.entitlementTypes.map((t: string) => (
+                <span
+                  key={t}
+                  className="rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between text-xs text-zinc-500">
+              <span className="truncate">{agent.slug}</span>
+              <span className="group-hover:text-zinc-900">→</span>
             </div>
           </Link>
         ))}
       </div>
 
-      <p style={{ marginTop: 32 }}>
-        <Link href="/">← Home</Link>
-      </p>
-    </main>
+      {/* Footer */}
+      <div className="text-sm">
+        <Link href="/" className="text-zinc-700 underline underline-offset-4">
+          ← Home
+        </Link>
+      </div>
+    </div>
   );
 }
